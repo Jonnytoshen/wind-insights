@@ -3,7 +3,7 @@
 
 | 字段     | 内容                              |
 | -------- | --------------------------------- |
-| 版本     | v1.0                              |
+| 版本     | v1.1                              |
 | 创建日期 | 2026-03-13                        |
 | 状态     | 草稿                              |
 | 关联文档 | [PRD.md](./PRD.md)                |
@@ -15,11 +15,13 @@
 1. [技术选型总览](#1-技术选型总览)
 2. [项目结构](#2-项目结构)
 3. [前端架构](#3-前端架构)
+   - [3.7 Tailwind CSS 4 集成](#37-tailwind-css-4-集成)
 4. [后端架构](#4-后端架构)
 5. [数据流设计](#5-数据流设计)
 6. [API 接口规范](#6-api-接口规范)
 7. [数据模型](#7-数据模型)
 8. [核心算法实现](#8-核心算法实现)
+   - [8.6 代表年选取](#86-代表年选取algorithmrepresentative_yearpy)
 9. [PDF 报告生成](#9-pdf-报告生成)
 10. [部署与运维](#10-部署与运维)
 11. [性能策略](#11-性能策略)
@@ -33,6 +35,7 @@
 | ------------ | ---------------------------------------- | ---------- |
 | 前端框架     | Vue 3 + TypeScript                       | Vue ≥ 3.4  |
 | 构建工具     | Vite                                     | ≥ 5.0      |
+| CSS 框架      | Tailwind CSS 4                           | ≥ 4.0      |
 | UI 组件库    | shadcn-vue                               | 最新       |
 | 地图         | Mapbox GL JS                             | ≥ 3.0      |
 | 图表         | Apache ECharts 5                         | ≥ 5.5      |
@@ -41,6 +44,7 @@
 | 实时进度     | SSE（EventSource）                       | 浏览器原生 |
 | 后端框架     | FastAPI                                  | ≥ 0.111    |
 | Python 版本  | Python 3.12                              |            |
+| Python 包管理 | uv                                       | 最新       |
 | 异步运行时   | Uvicorn + asyncio                        |            |
 | 数据处理     | Pandas 2 + NumPy + SciPy                 |            |
 | HTTP 客户端  | httpx（async）                           | ≥ 0.27     |
@@ -59,6 +63,7 @@ wind-insights/
 │   ├── public/
 │   ├── src/
 │   │   ├── assets/
+│   │   │   └── main.css               # Tailwind CSS 4 入口（@import "tailwindcss"）
 │   │   ├── components/            # 通用组件
 │   │   │   ├── map/               # 地图相关组件
 │   │   │   ├── charts/            # 图表组件（玫瑰图、Weibull 等）
@@ -105,11 +110,13 @@ wind-insights/
 │   │       ├── weibull.py         # Weibull MLE 拟合
 │   │       ├── extreme_wind.py    # 极端风速（Gumbel）
 │   │       ├── turbulence.py      # 湍流强度
-│   │       └── shear.py           # 风切变回归
+│   │       ├── shear.py           # 风切变回归
+│   │       └── representative_year.py  # 代表年选取
 │   ├── templates/                 # WeasyPrint PDF HTML 模板
 │   │   ├── report_base.html
 │   │   └── report_style.css
-│   ├── requirements.txt
+│   ├── pyproject.toml             # uv 项目配置（依赖声明）
+│   ├── uv.lock                    # 依赖锁文件（提交到版本控制）
 │   └── Dockerfile
 │
 ├── docs/
@@ -236,6 +243,59 @@ export function snapToMerra2Grid(lng: number, lat: number) {
 
 所有图表封装为独立 Vue 组件，接受 `data` prop，内部实例化 ECharts，通过 `ResizeObserver` 响应容器尺寸变化。图表定义统一存放在 `components/charts/` 目录，每个图表对应一个 `.ts` option 工厂函数文件，便于 PDF 生成时复用配置。
 
+### 3.7 Tailwind CSS 4 集成
+
+Tailwind CSS 4 采用 **CSS-first** 配置方式（无 `tailwind.config.js`），通过 `@tailwindcss/vite` Vite 插件驱动，与 shadcn-vue 深度集成。
+
+**安装**
+
+```bash
+npm install tailwindcss @tailwindcss/vite
+```
+
+**`vite.config.ts` 配置**
+
+```ts
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    tailwindcss(),   // Tailwind CSS 4 Vite 插件，替代 PostCSS 配置
+  ],
+})
+```
+
+**`src/assets/main.css`（全局 CSS 入口）**
+
+```css
+@import "tailwindcss";
+
+/* shadcn-vue CSS 变量（颜色、圆角等主题令牌） */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    /* ... 其余 shadcn-vue 令牌按需补充 */
+  }
+}
+```
+
+**注意**：Tailwind CSS 4 默认开启 **content 自动检测**（扫描 `src/` 下所有文件），无需手动配置 `content` 路径。如需扩展主题（自定义颜色、字体等），通过 CSS `@theme` 指令内联声明：
+
+```css
+@import "tailwindcss";
+
+@theme {
+  --color-brand: oklch(60% 0.2 250);
+  --font-sans: "Noto Sans SC", sans-serif;
+}
+```
+
 ---
 
 ## 4. 后端架构
@@ -359,6 +419,7 @@ class AnalysisEngine:
             shear=self._shear(),
             turbulence=self._turbulence(),
             extreme_wind=self._extreme_wind(),
+            representative_year=self._representative_year(),
         )
 ```
 
@@ -628,6 +689,16 @@ class ExtremeWindResult(BaseModel):
     return_periods: list[float]
     return_wind_speeds: list[float]
 
+class RepresentativeYearResult(BaseModel):
+    representative_year: int          # 选取的代表年年份
+    annual_mean_lt: float             # 长期年均风速（m/s）
+    annual_mean_ry: float             # 代表年年均风速（m/s）
+    deviation_pct: float              # 与长期均值偏差率（%）
+    monthly_correlation: float        # 月际分布 Pearson 相关系数
+    lt_monthly_means: list[float]     # 长期各月均风速（12 个值）
+    ry_monthly_means: list[float]     # 代表年各月均风速（12 个值）
+    years_ranking: list[dict]         # 所有候选年评分排名
+
 class AnalysisResult(BaseModel):
     task_id: str
     meta: dict
@@ -639,6 +710,7 @@ class AnalysisResult(BaseModel):
     shear: dict
     turbulence: dict
     extreme_wind: dict[str, ExtremeWindResult]
+    representative_year: dict[str, RepresentativeYearResult]  # key: str(height)
 ```
 
 ---
@@ -782,6 +854,96 @@ def iec_wind_class(annual_wpd: float) -> str:
     return "S 类（特殊，需专项设计）"
 ```
 
+### 8.6 代表年选取（`algorithms/representative_year.py`）
+
+从多年逐小时数据中筛选统计特性最接近长期平均的单一年份，作为风机发电量计算或进一步精细化分析的基准数据集。
+
+**评分方法**：综合两项指标，得分越低越优：
+
+| 指标               | 权重 | 计算方式                                              |
+| ------------------ | ---- | ----------------------------------------------------- |
+| 年均风速偏差率     | 60%  | `|V_year - V_lt| / V_lt`，归一化后乘以 0.6            |
+| 月际分布相关性     | 40%  | Pearson r（候选年月均 vs 长期月均），`(1 - r) × 0.4` |
+
+```python
+# algorithms/representative_year.py
+import numpy as np
+import pandas as pd
+from scipy.stats import pearsonr
+
+def select_representative_year(
+    df: pd.DataFrame,
+    ws_col: str,
+) -> dict:
+    """
+    从多年逐小时 DataFrame 中选取代表年。
+    df 必须包含 'timestamp'（datetime64）和 ws_col 列。
+    """
+    df = df.copy()
+    df["year"] = df["timestamp"].dt.year
+    df["month"] = df["timestamp"].dt.month
+
+    lt_monthly = df.groupby("month")[ws_col].mean()        # 长期月均
+    lt_annual_mean = float(df[ws_col].mean())               # 长期年均
+
+    years = sorted(df["year"].unique())
+    records = []
+
+    for year in years:
+        ydf = df[df["year"] == year]
+        year_mean = float(ydf[ws_col].mean())
+        year_monthly = ydf.groupby("month")[ws_col].mean().reindex(
+            range(1, 13), fill_value=np.nan
+        )
+
+        # 年均偏差率
+        mean_dev = abs(year_mean - lt_annual_mean) / lt_annual_mean * 100
+
+        # 月际 Pearson 相关（有效月份 ≥ 6）
+        valid = ~(year_monthly.isna() | lt_monthly.isna())
+        if valid.sum() >= 6:
+            r, _ = pearsonr(year_monthly[valid], lt_monthly[valid])
+        else:
+            r = 0.0
+
+        records.append({
+            "year": int(year),
+            "annual_mean": year_mean,
+            "mean_deviation_pct": mean_dev,
+            "monthly_correlation": float(r),
+            "monthly_means": year_monthly.fillna(0).tolist(),
+        })
+
+    scores_df = pd.DataFrame(records)
+
+    # 归一化年均偏差率，避免除零
+    max_dev = scores_df["mean_deviation_pct"].max()
+    scores_df["dev_norm"] = (
+        scores_df["mean_deviation_pct"] / max_dev if max_dev > 0 else 0.0
+    )
+    scores_df["score"] = (
+        0.6 * scores_df["dev_norm"]
+        + 0.4 * (1 - scores_df["monthly_correlation"])
+    )
+
+    best = scores_df.loc[scores_df["score"].idxmin()]
+
+    return {
+        "representative_year": int(best["year"]),
+        "annual_mean_lt": lt_annual_mean,
+        "annual_mean_ry": float(best["annual_mean"]),
+        "deviation_pct": float(best["mean_deviation_pct"]),
+        "monthly_correlation": float(best["monthly_correlation"]),
+        "lt_monthly_means": lt_monthly.tolist(),
+        "ry_monthly_means": best["monthly_means"],
+        "years_ranking": scores_df[
+            ["year", "annual_mean", "mean_deviation_pct", "monthly_correlation", "score"]
+        ].sort_values("score").to_dict("records"),
+    }
+```
+
+> **注意**：代表年分析对**每个分析高度**独立执行，因不同高度的风速序列可能导致不同年份被选为代表年；响应模型中以高度为键返回各高度的代表年结果。
+
 ---
 
 ## 9. PDF 报告生成
@@ -838,7 +1000,8 @@ WeasyPrint.HTML(string=html).write_pdf()
   {% include "sections/06_shear.html" %}
   {% include "sections/07_turbulence.html" %}
   {% include "sections/08_extreme_wind.html" %}
-  {% include "sections/09_conclusion.html" %}
+  {% include "sections/09_representative_year.html" %}
+  {% include "sections/10_conclusion.html" %}
 </body>
 </html>
 ```
@@ -931,25 +1094,74 @@ server {
 
 ### 10.3 后端 Dockerfile
 
+使用 `uv` 代替 `pip` 安装依赖，利用其构建缓存层提升镜像重建速度。
+
 ```dockerfile
 # backend/Dockerfile
 FROM python:3.12-slim
 WORKDIR /app
 
-# WeasyPrint 依赖系统库
+# 安装系统依赖（WeasyPrint 所需）
 RUN apt-get update && apt-get install -y \
     libpango-1.0-0 libpangoft2-1.0-0 libffi-dev \
-    fontconfig fonts-noto-cjk \
+    fontconfig fonts-noto-cjk curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 安装 uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# 先复制依赖声明文件，利用 Docker layer 缓存
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 COPY . .
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
 ```
 
-### 10.4 环境变量（`.env.example`）
+### 10.4 后端 `pyproject.toml`（uv 项目配置）
+
+```toml
+[project]
+name = "wind-insights-backend"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "scipy>=1.13",
+    "weasyprint>=62",
+    "jinja2>=3.1",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8",
+    "httpx>=0.27",  # 用于 FastAPI TestClient
+]
+```
+
+**常用 uv 命令**
+
+```bash
+# 初始化项目（首次）
+uv init --no-workspace
+
+# 添加依赖
+uv add fastapi uvicorn httpx pandas numpy scipy weasyprint
+
+# 同步安装所有依赖（生产）
+uv sync --frozen
+
+# 运行开发服务器
+uv run uvicorn app.main:app --reload
+```
+
+### 10.5 环境变量（`.env.example`）
 
 ```env
 # Mapbox（前端构建时注入）
