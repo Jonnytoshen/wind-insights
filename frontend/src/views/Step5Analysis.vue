@@ -65,7 +65,10 @@ const observer = new IntersectionObserver(
 onUnmounted(() => observer.disconnect())
 
 function registerCard(el: Element | null, key: string) {
-  if (el) observer.observe(el)
+  if (el) {
+    ;(el as HTMLElement).dataset.moduleKey = key
+    observer.observe(el)
+  }
 }
 </script>
 
