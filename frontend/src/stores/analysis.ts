@@ -7,6 +7,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const result = ref<IAnalysisResult | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  /** Chart images captured from Step5 ECharts instances, keyed by e.g. "windrose_100m" */
+  const chartImages = ref<Record<string, string>>({})
 
   function setTaskId(id: string) {
     taskId.value = id
@@ -33,6 +35,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
     result.value = null
     isLoading.value = false
     error.value = null
+    chartImages.value = {}
+  }
+
+  function setChartImage(key: string, dataUrl: string) {
+    chartImages.value[key] = dataUrl
   }
 
   return {
@@ -40,10 +47,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
     result,
     isLoading,
     error,
+    chartImages,
     setTaskId,
     setResult,
     setLoading,
     setError,
     clearResult,
+    setChartImage,
   }
 })

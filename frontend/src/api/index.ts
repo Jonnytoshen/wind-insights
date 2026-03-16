@@ -33,8 +33,22 @@ apiClient.interceptors.response.use(
     }
     return response
   },
-  (error) => {
-    const message = error.response?.data?.detail ?? error.message ?? '请求失败，请稍后重试'
+  async (error) => {
+    // When responseType is 'blob', error response bodies arrive as Blob objects.
+    // Parse them back to JSON so we can extract the `detail` error message.
+    const data = error.response?.data
+    let detail: string | undefined
+    if (data instanceof Blob && data.type.includes('application/json')) {
+      try {
+        const text = await data.text()
+        detail = (JSON.parse(text) as { detail?: string }).detail
+      } catch {
+        // ignore parse errors
+      }
+    } else {
+      detail = data?.detail
+    }
+    const message = detail ?? error.message ?? '请求失败，请稍后重试'
     console.error('[API Error]', message, error.response?.status)
     return Promise.reject(new Error(message))
   }

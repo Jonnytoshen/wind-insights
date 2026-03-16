@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import urllib.parse
+from functools import partial
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -23,7 +25,11 @@ async def generate_report(req: ReportRequest):
         raise HTTPException(status_code=409, detail="任务尚未完成")
 
     try:
-        pdf_bytes = generate_pdf(
+        # Run WeasyPrint in a thread-pool executor to avoid blocking the
+        # async event loop (CJK font loading can take 30-60 s on cold start).
+        loop = asyncio.get_event_loop()
+        fn = partial(
+            generate_pdf,
             analysis_result=task.result,
             report_config={
                 "project_name": req.project_name,
@@ -34,6 +40,7 @@ async def generate_report(req: ReportRequest):
             },
             chart_images=req.chart_images,
         )
+        pdf_bytes = await loop.run_in_executor(None, fn)
     except PdfGenerationError as exc:
         logger.error("PDF 生成失败 task=%s: %s", req.task_id, exc)
         raise HTTPException(status_code=500, detail=f"PDF 生成失败: {exc}")

@@ -8,7 +8,7 @@ import { generateReport, exportCsv } from '@/api'
 const wizardStore = useWizardStore()
 const analysisStore = useAnalysisStore()
 const { reportConfig } = storeToRefs(wizardStore)
-const { taskId, result } = storeToRefs(analysisStore)
+const { taskId, result, chartImages } = storeToRefs(analysisStore)
 
 const generating = ref(false)
 const genError = ref('')
@@ -17,7 +17,7 @@ const downloadUrl = ref('')
 const exportingCsv = ref(false)
 const csvError = ref('')
 
-const confidentialityOptions = ['公开', '内部', '秘密', '机密'] as const
+const confidentialityOptions = ['公开', '内部', '保密', '机密'] as const
 
 // 自动填充项目名称和地址
 if (!reportConfig.value.projectName && result.value?.params.projectName) {
@@ -61,23 +61,18 @@ async function handleGeneratePdf() {
   downloadUrl.value = ''
 
   try {
-    // 收集图表图片（各 ECharts 实例 getDataURL）
-    // 在 Step5Analysis 懒加载场景下图表可能不在 DOM 中，此处收集页面上已渲染的图表
-    const chartImages: Record<string, string> = {}
-    document.querySelectorAll<HTMLCanvasElement>('canvas[data-chart-id]').forEach((canvas) => {
-      const id = canvas.getAttribute('data-chart-id') ?? ''
-      if (id) chartImages[id] = canvas.toDataURL('image/png')
-    })
-
-    const blob = await generateReport(taskId.value, chartImages, reportConfig.value)
+    // Use chart images captured in Step5Analysis via the analysis store.
+    // Charts the user scrolled past in Step5 will be present; any not yet
+    // viewed will be absent and the PDF template will show a placeholder.
+    const blob = await generateReport(taskId.value, chartImages.value, reportConfig.value)
     const url = URL.createObjectURL(blob)
     downloadUrl.value = url
 
-    // 自动触发下载
+    // Trigger browser download
     const a = document.createElement('a')
     a.href = url
-    const date = reportConfig.value.reportDate.replaceAll('-', '')
-    a.download = `wind_report_${date}.pdf`
+    const date = (reportConfig.value.reportDate ?? '').replaceAll('-', '')
+    a.download = `wind_report_${date || 'report'}.pdf`
     a.click()
   } catch (err) {
     genError.value = err instanceof Error ? err.message : '生成 PDF 失败，请重试'
@@ -161,6 +156,17 @@ async function handleGeneratePdf() {
         <li>代表年分析</li>
         <li>综合评价</li>
       </ol>
+    </div>
+
+    <!-- 图表采集状态提示 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 flex items-start gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0 mt-0.5">
+        <path d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+      </svg>
+      <span>
+        已采集 <strong>{{ Object.keys(chartImages).length }}</strong> 张图表。
+        如需完整图表，请先在"详细分析"步骤中滚动浏览所有分析模块，再返回此处生成报告。
+      </span>
     </div>
 
     <!-- 错误提示 -->

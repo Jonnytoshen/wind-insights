@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onUnmounted } from 'vue'
+import { ref, reactive, computed, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
 import WindSpeedLineChart from '@/components/charts/WindSpeedLineChart.vue'
@@ -47,6 +47,31 @@ const modules = computed(() => {
 // Lazy rendering — chart is only mounted once its card scrolls into view
 const mounted = reactive<Record<string, boolean>>({})
 
+// Template refs for chart component instances (keyed by module key)
+type ChartInstance = { getDataURL?: () => string | undefined } | null
+const chartInstances = reactive<Record<string, ChartInstance>>({})
+
+function captureChart(modKey: string) {
+  const instance = chartInstances[modKey]
+  if (!instance?.getDataURL) return
+  const dataUrl = instance.getDataURL()
+  if (!dataUrl) return
+  const mod = modules.value.find(m => m.key === modKey)
+  if (!mod) return
+  const storeKey = mod.needsHeight ? `${modKey}_${heightKey.value}` : modKey
+  analysisStore.setChartImage(storeKey, dataUrl)
+}
+
+// Re-capture height-dependent charts when the user switches the active height
+watch(heightKey, () => {
+  for (const mod of modules.value) {
+    if (mod.needsHeight && mounted[mod.key]) {
+      // ECharts re-renders on prop change; give it a tick + one frame
+      nextTick(() => requestAnimationFrame(() => captureChart(mod.key)))
+    }
+  }
+})
+
 const observer = new IntersectionObserver(
   (entries) => {
     entries.forEach((entry) => {
@@ -55,6 +80,8 @@ const observer = new IntersectionObserver(
         if (key && !mounted[key]) {
           mounted[key] = true
           observer.unobserve(entry.target)
+          // Capture chart image once ECharts has rendered (nextTick + rAF)
+          nextTick(() => requestAnimationFrame(() => captureChart(key)))
         }
       }
     })
@@ -113,26 +140,31 @@ function registerCard(el: Element | null, key: string) {
             <template v-if="mounted[mod.key]">
               <WindSpeedLineChart
                 v-if="mod.key === 'basic'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.basicStats[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <WindRoseChart
                 v-else-if="mod.key === 'windrose'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.windRoseData[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <WeibullChart
                 v-else-if="mod.key === 'weibull'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.weibullResults[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <WpdChart
                 v-else-if="mod.key === 'wpd'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.wpdResults[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <ShearProfileChart
                 v-else-if="mod.key === 'shear' && result.shearResult"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.shearResult"
               />
               <div
@@ -143,21 +175,25 @@ function registerCard(el: Element | null, key: string) {
               </div>
               <TurbulenceChart
                 v-else-if="mod.key === 'turbulence'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.turbulenceData[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <ExtremeWindChart
                 v-else-if="mod.key === 'extreme'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.extremeWindResults[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <RepYearChart
                 v-else-if="mod.key === 'repyear'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :data="result.representativeYearResults[heightKey]"
                 :height="parseInt(heightKey)"
               />
               <MultiHeightCompare
                 v-else-if="mod.key === 'compare'"
+                :ref="(el: any) => { chartInstances[mod.key] = el }"
                 :result="result"
               />
             </template>
