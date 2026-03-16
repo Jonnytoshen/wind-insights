@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 from typing import AsyncGenerator
 
+import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -18,6 +20,25 @@ from app.services.nasa_power import fetch_wind_data, NASAPowerError
 from app.services.analysis_engine import run_full_analysis
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# In-memory store for raw hourly data (for CSV export).
+# Keyed by task_id; automatically capped at _MAX_RAW_STORE entries.
+# ---------------------------------------------------------------------------
+_raw_data_store: dict[str, pd.DataFrame] = {}
+_MAX_RAW_STORE = 20
+
+
+def _store_raw_data(task_id: str, raw_data: dict[int, pd.DataFrame]) -> None:
+    """Merge per-height DataFrames and keep in memory for later CSV export."""
+    if not raw_data:
+        return
+    merged = pd.concat(raw_data.values(), axis=1).sort_index()
+    # Evict oldest entries when store is full
+    if len(_raw_data_store) >= _MAX_RAW_STORE:
+        oldest = next(iter(_raw_data_store))
+        del _raw_data_store[oldest]
+    _raw_data_store[task_id] = merged
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
 
@@ -50,6 +71,9 @@ async def _run_analysis_task(task_id: str, req: AnalysisRequest) -> None:
             wind_surface=req.wind_surface,
             progress_callback=fetch_progress,
         )
+
+        # Persist raw hourly data for CSV export
+        _store_raw_data(task_id, raw_data)
 
         task_manager.update_task(task_id, progress=60, message="正在运行风资源分析算法...", current_step="算法计算")
 
@@ -143,3 +167,38 @@ async def get_result(task_id: str):
     if task.result is None:
         raise HTTPException(status_code=500, detail="任务结果为空")
     return task.result
+
+
+@router.get("/{task_id}/export/csv")
+async def export_csv(task_id: str):
+    """Stream the raw hourly wind data as a UTF-8 CSV file."""
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if task.status in ("pending", "running"):
+        raise HTTPException(status_code=409, detail="任务仍在进行中，请等待分析完成后再导出")
+    if task.status == "error":
+        raise HTTPException(status_code=422, detail="任务已失败，无可导出的数据")
+
+    df = _raw_data_store.get(task_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="原始数据不存在或已过期，请重新分析")
+
+    # Rename index to 'timestamp' and reset so it appears as the first column
+    df_export = df.copy()
+    df_export.index.name = "timestamp"
+    df_export = df_export.reset_index()
+    df_export["timestamp"] = df_export["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    buf = io.StringIO()
+    df_export.to_csv(buf, index=False, float_format="%.4f")
+    csv_bytes = buf.getvalue().encode("utf-8-sig")  # utf-8-sig adds BOM for Excel compatibility
+
+    short_id = task_id.split("-")[0]
+    filename = f"wind_data_{short_id}.csv"
+
+    return StreamingResponse(
+        iter([csv_bytes]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+    )

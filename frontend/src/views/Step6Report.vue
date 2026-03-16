@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWizardStore } from '@/stores/wizard'
 import { useAnalysisStore } from '@/stores/analysis'
-import { generateReport } from '@/api'
+import { generateReport, exportCsv } from '@/api'
 
 const wizardStore = useWizardStore()
 const analysisStore = useAnalysisStore()
@@ -13,6 +13,9 @@ const { taskId, result } = storeToRefs(analysisStore)
 const generating = ref(false)
 const genError = ref('')
 const downloadUrl = ref('')
+
+const exportingCsv = ref(false)
+const csvError = ref('')
 
 const confidentialityOptions = ['公开', '内部', '秘密', '机密'] as const
 
@@ -24,6 +27,28 @@ if (!reportConfig.value.projectAddress && result.value?.location) {
   const loc = result.value.location
   reportConfig.value.projectAddress =
     `纬度 ${loc.gridLat.toFixed(3)}°N，经度 ${loc.gridLng.toFixed(3)}°E`
+}
+
+async function handleExportCsv() {
+  if (!taskId.value) {
+    csvError.value = '未找到分析任务，请重新分析'
+    return
+  }
+  exportingCsv.value = true
+  csvError.value = ''
+  try {
+    const blob = await exportCsv(taskId.value)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `wind_data_${taskId.value.split('-')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    csvError.value = err instanceof Error ? err.message : '导出 CSV 失败，请重试'
+  } finally {
+    exportingCsv.value = false
+  }
 }
 
 async function handleGeneratePdf() {
@@ -143,11 +168,25 @@ async function handleGeneratePdf() {
       {{ genError }}
     </div>
 
+    <!-- CSV 错误提示 -->
+    <div v-if="csvError" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+      {{ csvError }}
+    </div>
+
     <!-- 下载成功提示 -->
     <div v-if="downloadUrl" class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
       ✅ PDF 报告已生成，浏览器正在下载…
       <a :href="downloadUrl" download class="ml-2 underline">重新下载</a>
     </div>
+
+    <!-- 导出 CSV 按钮 -->
+    <button
+      class="w-full py-3 bg-white text-blue-600 font-medium rounded-lg border border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      :disabled="exportingCsv || !taskId"
+      @click="handleExportCsv"
+    >
+      {{ exportingCsv ? '导出中，请稍候…' : '⬇ 导出逐小时数据（CSV）' }}
+    </button>
 
     <!-- 生成按钮 -->
     <button

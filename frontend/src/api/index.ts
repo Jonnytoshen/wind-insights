@@ -84,4 +84,12 @@ export async function generateReport(
   return data
 }
 
+export async function exportCsv(taskId: string): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/analysis/${taskId}/export/csv`, {
+    responseType: 'blob',
+    timeout: 60000,
+  })
+  return data
+}
+
 export default apiClient
