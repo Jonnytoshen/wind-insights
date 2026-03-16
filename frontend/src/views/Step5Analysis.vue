@@ -173,4 +173,5 @@ function registerCard(el: Element | null, key: string) {
         </section>
       </div>
     </template>
+  </div>
 </template>
