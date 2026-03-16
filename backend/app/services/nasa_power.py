@@ -53,14 +53,26 @@ async def _fetch_year(
     for attempt in range(_MAX_RETRIES):
         async with semaphore:
             try:
+                logger.info(
+                    "[NASA POWER] 请求开始 height=%dm year=%d (attempt %d/%d)",
+                    height, year, attempt + 1, _MAX_RETRIES,
+                )
                 response = await client.get(
                     NASA_POWER_ENDPOINT,
                     params=params,
                     timeout=60.0,
                 )
                 response.raise_for_status()
+                logger.info(
+                    "[NASA POWER] 请求成功 height=%dm year=%d — HTTP %d",
+                    height, year, response.status_code,
+                )
                 return response.json()
             except httpx.HTTPStatusError as exc:
+                logger.warning(
+                    "[NASA POWER] HTTP 错误 height=%dm year=%d — %d (attempt %d/%d)",
+                    height, year, exc.response.status_code, attempt + 1, _MAX_RETRIES,
+                )
                 if exc.response.status_code in (429, 503) and attempt < _MAX_RETRIES - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
@@ -68,6 +80,10 @@ async def _fetch_year(
                     f"NASA POWER API HTTP {exc.response.status_code} for height={height}m year={year}"
                 ) from exc
             except (httpx.RequestError, httpx.TimeoutException) as exc:
+                logger.warning(
+                    "[NASA POWER] 网络错误 height=%dm year=%d — %s (attempt %d/%d)",
+                    height, year, exc, attempt + 1, _MAX_RETRIES,
+                )
                 if attempt < _MAX_RETRIES - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
@@ -130,6 +146,11 @@ async def fetch_wind_data(
     tasks_total = len(heights) * len(years)
     tasks_done = 0
 
+    logger.info(
+        "[NASA POWER] 开始获取数据 lat=%.4f lon=%.4f heights=%s years=%d-%d surface=%s (共 %d 段)",
+        grid_lat, grid_lon, heights, start_year, end_year, wind_surface, tasks_total,
+    )
+
     limits = httpx.Limits(max_connections=NASA_MAX_CONNECTIONS, max_keepalive_connections=5)
     semaphore = asyncio.Semaphore(NASA_MAX_CONNECTIONS)
 
@@ -152,9 +173,13 @@ async def fetch_wind_data(
                 year_data = await task
                 df = _parse_year_response(year_data, h)
                 results_by_height[h].append(df)
+                logger.info(
+                    "[NASA POWER] 解析完成 height=%dm year=%d — %d 条记录",
+                    h, y, len(df),
+                )
             except NASAPowerError as exc:
                 errors.append(str(exc))
-                logger.warning("跳过 height=%dm year=%d: %s", h, y, exc)
+                logger.warning("[NASA POWER] 跳过 height=%dm year=%d: %s", h, y, exc)
 
             tasks_done += 1
             if progress_callback:
@@ -173,5 +198,12 @@ async def fetch_wind_data(
         frames = results_by_height[h]
         if frames:
             combined[h] = pd.concat(frames).sort_index()
+            logger.info(
+                "[NASA POWER] height=%dm 汇总完成 — 共 %d 条记录（%d 年成功，%d 年跳过）",
+                h, len(combined[h]), len(frames), len(years) - len(frames),
+            )
+        else:
+            logger.error("[NASA POWER] height=%dm 无可用数据，所有年份均失败", h)
 
+    logger.info("[NASA POWER] 全部数据获取完成，成功 %d 个高度", len(combined))
     return combined
