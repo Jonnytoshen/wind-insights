@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+MAX_DATA_YEAR = datetime.date.today().year - 1  # NASA POWER data lags ~1 year
 
+
+# NASA POWER wind-surface options (IGBP vegetation classification, types 1-18)
 VALID_SURFACES = frozenset([
     "vegtype_1", "vegtype_2", "vegtype_3", "vegtype_4", "vegtype_5",
-    "vegtype_6", "vegtype_7", "vegtype_8",
+    "vegtype_6", "vegtype_7", "vegtype_8", "vegtype_9", "vegtype_10",
+    "vegtype_11", "vegtype_12", "vegtype_13", "vegtype_14", "vegtype_15",
+    "vegtype_16", "vegtype_17", "vegtype_18",
 ])
 
 
@@ -52,15 +58,15 @@ class AnalysisRequest(BaseModel):
     @field_validator("start_year")
     @classmethod
     def validate_start_year(cls, v: int) -> int:
-        if not (1981 <= v <= 2024):
-            raise ValueError("起始年份必须在 1981–2024 之间")
+        if not (1981 <= v <= MAX_DATA_YEAR):
+            raise ValueError(f"起始年份必须在 1981–{MAX_DATA_YEAR} 之间")
         return v
 
     @field_validator("end_year")
     @classmethod
     def validate_end_year(cls, v: int) -> int:
-        if not (1981 <= v <= 2024):
-            raise ValueError("结束年份必须在 1981–2024 之间")
+        if not (1981 <= v <= MAX_DATA_YEAR):
+            raise ValueError(f"结束年份必须在 1981–{MAX_DATA_YEAR} 之间")
         return v
 
     @field_validator("wind_surface")

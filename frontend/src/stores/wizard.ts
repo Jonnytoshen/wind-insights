@@ -9,7 +9,7 @@ const DEFAULT_PARAMS: IAnalysisParams = {
   heights: [100],
   startYear: CURRENT_YEAR - 10,
   endYear: CURRENT_YEAR - 1,
-  windSurface: 'vegtype_11',
+  windSurface: 'vegtype_8',
   filterOutliers: true,
   projectName: '',
 }
