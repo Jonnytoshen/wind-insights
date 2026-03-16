@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ config.project_name | e }} — 风资源分析报告</title>
+  <link rel="stylesheet" href="report_style.css" />
+</head>
+<body>
+
+<!-- ===== 封面 ===== -->
+<section class="cover">
+  <div class="cover-badge">{{ config.confidentiality | e }}</div>
+  <h1 class="cover-title">风资源分析报告</h1>
+  <h2 class="cover-subtitle">{{ config.project_name | e }}</h2>
+  <table class="cover-meta">
+    <tr><td>项目地址</td><td>{{ config.project_address | e }}</td></tr>
+    <tr><td>分析坐标</td><td>
+      {{ "%.4f" | format(result.location.lat) }}°N &nbsp;
+      {{ "%.4f" | format(result.location.lng) }}°E
+    </td></tr>
+    <tr><td>分析高度</td><td>{{ result.analysis_heights | join(", ") }} m</td></tr>
+    <tr><td>数据年限</td><td>{{ result.params.start_year }} — {{ result.params.end_year }}</td></tr>
+    <tr><td>地表类型</td><td>{{ result.params.wind_surface | e }}</td></tr>
+    <tr><td>报告日期</td><td>{{ config.report_date | e }}</td></tr>
+    <tr><td>编制单位</td><td>{{ config.organization | e }}</td></tr>
+  </table>
+  <p class="cover-footer">本报告由 Wind Insights 平台自动生成，数据来源：NASA POWER MERRA-2</p>
+</section>
+
+<div class="page-break"></div>
+
+<!-- ===== 目录 ===== -->
+<section class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li>基础统计</li>
+    <li>风向频率玫瑰图</li>
+    <li>Weibull 分布拟合</li>
+    <li>风功率密度</li>
+    {% if result.shear_result %}<li>风切变分析</li>{% endif %}
+    <li>湍流强度</li>
+    <li>极端风速</li>
+    <li>代表年分析</li>
+    {% if heights | length >= 2 %}<li>多高度对比</li>{% endif %}
+  </ol>
+</section>
+
+<div class="page-break"></div>
+
+<!-- ===== 各高度分析 ===== -->
+{% for h in heights %}
+{% set key = h | string + "m" %}
+{% set bs = result.basic_stats.get(key, {}) %}
+{% set wb = result.weibull_results.get(key, {}) %}
+{% set wpd = result.wpd_results.get(key, {}) %}
+{% set ti = result.turbulence_data.get(key, {}) %}
+{% set ew = result.extreme_wind_results.get(key, {}) %}
+{% set ry = result.representative_year_results.get(key, {}) %}
+
+<section class="height-section">
+  <h2>{{ h }} m 高度分析</h2>
+
+  <!-- 1. 基础统计 -->
+  <h3>1. 基础统计</h3>
+  <table class="stat-table">
+    <tr><th>指标</th><th>数值</th></tr>
+    <tr><td>年均风速</td><td>{{ "%.2f" | format(bs.annual_mean_ws) if bs.annual_mean_ws is defined else "—" }} m/s</td></tr>
+    <tr><td>有效数据率</td><td>{{ "%.1f" | format(bs.data_valid_rate) if bs.data_valid_rate is defined else "—" }} %</td></tr>
+    <tr><td>异常值数量</td><td>{{ bs.outlier_count if bs.outlier_count is defined else "—" }}</td></tr>
+    <tr><td>主导风向</td><td>{{ bs.dominant_direction | e if bs.dominant_direction is defined else "—" }}</td></tr>
+    <tr><td>年均 WPD</td><td>{{ "%.1f" | format(wpd.annual_wpd) if wpd.annual_wpd is defined else "—" }} W/m²</td></tr>
+    <tr><td>Weibull k</td><td>{{ "%.3f" | format(wb.k) if wb.k is defined else "—" }}</td></tr>
+    <tr><td>Weibull c</td><td>{{ "%.3f" | format(wb.c) if wb.c is defined else "—" }} m/s</td></tr>
+    <tr><td>TI (15 m/s)</td><td>{{ "%.3f" | format(ti.ti15) if ti.ti15 is defined and ti.ti15 != None else "—" }}</td></tr>
+  </table>
+
+  <!-- 2. 风向玫瑰图 -->
+  <h3>2. 风向频率玫瑰图</h3>
+  {% if images.get("windrose_" + key) %}
+  <img src="{{ images["windrose_" + key] }}" class="chart-img" alt="风向玫瑰图 {{ key }}" />
+  {% else %}
+  <p class="no-chart">图表数据未提供</p>
+  {% endif %}
+
+  <!-- 3. Weibull 分布 -->
+  <h3>3. Weibull 分布拟合</h3>
+  {% if images.get("weibull_" + key) %}
+  <img src="{{ images["weibull_" + key] }}" class="chart-img" alt="Weibull 拟合 {{ key }}" />
+  {% else %}
+  <p class="no-chart">图表数据未提供</p>
+  {% endif %}
+
+  <!-- 4. 风功率密度 -->
+  <h3>4. 风功率密度</h3>
+  {% if images.get("wpd_" + key) %}
+  <img src="{{ images["wpd_" + key] }}" class="chart-img" alt="风功率密度 {{ key }}" />
+  {% else %}
+  <p class="no-chart">图表数据未提供</p>
+  {% endif %}
+
+  <!-- 5. 湍流强度 -->
+  <h3>5. 湍流强度</h3>
+  <p>年均湍流强度：
+    <strong>{{ "%.3f" | format(ti.annual_mean_ti) if ti.annual_mean_ti is defined else "—" }}</strong>
+    &nbsp;｜&nbsp; TI@15 m/s：
+    <strong>{{ "%.3f" | format(ti.ti15) if ti.ti15 is defined and ti.ti15 != None else "—" }}</strong>
+  </p>
+  {% if images.get("turbulence_" + key) %}
+  <img src="{{ images["turbulence_" + key] }}" class="chart-img" alt="湍流强度 {{ key }}" />
+  {% endif %}
+
+  <!-- 6. 极端风速 -->
+  <h3>6. 极端风速（Gumbel I 型）</h3>
+  {% if ew.get("error") %}
+  <p class="warning">⚠ {{ ew.error | e }}</p>
+  {% else %}
+  <table class="stat-table">
+    <tr><th>重现期</th><th>极端风速</th></tr>
+    <tr><td>50 年一遇 V₅₀</td><td>{{ "%.1f" | format(ew.v50) if ew.v50 is defined else "—" }} m/s</td></tr>
+    <tr><td>100 年一遇 V₁₀₀</td><td>{{ "%.1f" | format(ew.v100) if ew.v100 is defined else "—" }} m/s</td></tr>
+    <tr><td>样本年数</td><td>{{ ew.sample_years if ew.sample_years is defined else "—" }} 年</td></tr>
+  </table>
+  {% if images.get("extreme_" + key) %}
+  <img src="{{ images["extreme_" + key] }}" class="chart-img" alt="极端风速 {{ key }}" />
+  {% endif %}
+  {% endif %}
+
+  <!-- 7. 代表年 -->
+  <h3>7. 代表年分析</h3>
+  {% if ry %}
+  <p>代表年：<strong>{{ ry.representative_year }}</strong>
+    &nbsp;｜&nbsp; 偏差：
+    <strong>{{ "%.2f" | format(ry.bias_from_long_term) }} m/s</strong>
+  </p>
+  {% if images.get("repyear_" + key) %}
+  <img src="{{ images["repyear_" + key] }}" class="chart-img" alt="代表年 {{ key }}" />
+  {% endif %}
+  {% endif %}
+
+</section>
+<div class="page-break"></div>
+{% endfor %}
+
+<!-- ===== 风切变（跨高度） ===== -->
+{% if result.shear_result %}
+<section class="height-section">
+  <h2>风切变分析</h2>
+  <table class="stat-table">
+    <tr><th>指标</th><th>数值</th></tr>
+    <tr><td>风切变指数 α</td><td>{{ "%.4f" | format(result.shear_result.alpha) }}</td></tr>
+    <tr><td>拟合 R²</td><td>{{ "%.4f" | format(result.shear_result.r2) }}</td></tr>
+  </table>
+  {% if images.get("shear") %}
+  <img src="{{ images["shear"] }}" class="chart-img" alt="风切变剖面" />
+  {% endif %}
+</section>
+<div class="page-break"></div>
+{% endif %}
+
+<!-- ===== 多高度对比 ===== -->
+{% if heights | length >= 2 %}
+<section class="height-section">
+  <h2>多高度风速对比</h2>
+  <table class="stat-table">
+    <tr>
+      <th>高度</th>
+      <th>年均风速 (m/s)</th>
+      <th>年均 WPD (W/m²)</th>
+      <th>Weibull k</th>
+      <th>Weibull c (m/s)</th>
+    </tr>
+    {% for h in heights %}
+    {% set key = h | string + "m" %}
+    {% set bs = result.basic_stats.get(key, {}) %}
+    {% set wpd = result.wpd_results.get(key, {}) %}
+    {% set wb = result.weibull_results.get(key, {}) %}
+    <tr>
+      <td>{{ h }} m</td>
+      <td>{{ "%.2f" | format(bs.annual_mean_ws) if bs.annual_mean_ws is defined else "—" }}</td>
+      <td>{{ "%.1f" | format(wpd.annual_wpd) if wpd.annual_wpd is defined else "—" }}</td>
+      <td>{{ "%.3f" | format(wb.k) if wb.k is defined else "—" }}</td>
+      <td>{{ "%.3f" | format(wb.c) if wb.c is defined else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if images.get("compare") %}
+  <img src="{{ images["compare"] }}" class="chart-img" alt="多高度对比" />
+  {% endif %}
+</section>
+{% endif %}
+
+</body>
+</html>
