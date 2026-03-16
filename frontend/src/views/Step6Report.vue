@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWizardStore } from '@/stores/wizard'
 import { useAnalysisStore } from '@/stores/analysis'

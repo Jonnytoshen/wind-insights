@@ -32,7 +32,7 @@ watch(() => [props.data, props.height], () => {
 })
 
 defineExpose({
-  getDataURL: (opts?: echarts.EChartsConvertFinder) =>
+  getDataURL: (opts?: { type?: 'png' | 'jpeg' | 'svg'; pixelRatio?: number; backgroundColor?: string }) =>
     chart?.getDataURL({ type: 'png', pixelRatio: 2, ...opts }),
 })
 </script>

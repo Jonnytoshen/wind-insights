@@ -41,7 +41,7 @@ export function turbulenceOption(data: ITurbulenceData): EChartsOption {
         type: 'custom',
         name: 'TI 标准差',
         data: errorBarData,
-        renderItem: (params: any, api: any) => {
+        renderItem: (_params: any, api: any) => {
           const xVal = api.value(0)
           const highPoint = api.coord([xVal, api.value(1)])
           const lowPoint = api.coord([xVal, api.value(2)])
