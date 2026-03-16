@@ -63,14 +63,14 @@ function useHistoryLocation(item: { lat: number; lng: number; gridLat: number; g
 </script>
 
 <template>
-  <div class="flex h-full" style="height: calc(100vh - 180px)">
-    <!-- 地图区域 -->
-    <div class="flex-1 relative">
+  <div class="flex flex-col md:flex-row h-full">
+    <!-- 地图区域：移动端固定高度，桌面端展开填充 -->
+    <div class="h-64 md:flex-1 md:h-auto relative shrink-0">
       <MapboxMap :selected-location="location" @location-selected="onLocationSelected" />
     </div>
 
-    <!-- 右侧信息面板 -->
-    <aside class="w-80 bg-white border-l border-gray-200 flex flex-col p-4 gap-4 overflow-y-auto">
+    <!-- 信息面板：移动端在地图下方，桌面端在右侧 -->
+    <aside class="flex-1 md:flex-none md:w-80 bg-white border-t md:border-t-0 md:border-l border-gray-200 flex flex-col p-4 gap-4 overflow-y-auto">
       <h2 class="text-base font-semibold text-gray-800">选择分析点位</h2>
 
       <!-- 坐标直接输入 -->

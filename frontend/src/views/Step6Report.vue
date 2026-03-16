@@ -174,27 +174,36 @@ async function handleGeneratePdf() {
     </div>
 
     <!-- 下载成功提示 -->
-    <div v-if="downloadUrl" class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
-      ✅ PDF 报告已生成，浏览器正在下载…
-      <a :href="downloadUrl" download class="ml-2 underline">重新下载</a>
+    <div v-if="downloadUrl" class="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2 text-sm text-green-700">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-green-500 shrink-0">
+        <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+      PDF 报告已生成，浏览器正在下载…
+      <a :href="downloadUrl" download class="ml-auto underline shrink-0">重新下载</a>
     </div>
 
     <!-- 导出 CSV 按钮 -->
     <button
-      class="w-full py-3 bg-white text-blue-600 font-medium rounded-lg border border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      class="w-full py-3 bg-white text-blue-600 font-medium rounded-lg border border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
       :disabled="exportingCsv || !taskId"
       @click="handleExportCsv"
     >
-      {{ exportingCsv ? '导出中，请稍候…' : '⬇ 导出逐小时数据（CSV）' }}
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+        <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </svg>
+      {{ exportingCsv ? '导出中，请稍候…' : '导出逐小时数据（CSV）' }}
     </button>
 
     <!-- 生成按钮 -->
     <button
-      class="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      class="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
       :disabled="generating || !taskId"
       @click="handleGeneratePdf"
     >
-      {{ generating ? '生成中，请稍候…' : '📄 生成 PDF 报告' }}
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+        <path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+      </svg>
+      {{ generating ? '生成中，请稍候…' : '生成 PDF 报告' }}
     </button>
   </div>
 </template>

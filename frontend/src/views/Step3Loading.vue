@@ -13,7 +13,6 @@ const { triggerAnalysis, fetchResult } = useAnalysis()
 const { taskId, error } = storeToRefs(analysisStore)
 const { progress, sseError, reconnecting } = useSSE(taskId)
 
-const logMessages = ref<string[]>([])
 const retrying = ref(false)
 
 onMounted(async () => {
@@ -24,17 +23,12 @@ onMounted(async () => {
 })
 
 async function startTask() {
-  logMessages.value = []
   await triggerAnalysis()
 }
 
-// 监听进度变化，追加日志
+// 监听进度变化，分析成功后自动跳转步骤 4
 import { watch } from 'vue'
 watch(progress, (p) => {
-  if (p?.message) {
-    logMessages.value.push(p.message)
-  }
-  // 分析成功后自动跳转步骤 4
   if (p?.status === 'success') {
     fetchResult().then(() => {
       setTimeout(() => wizardStore.nextStep(), 600)
@@ -45,7 +39,6 @@ watch(progress, (p) => {
 async function retry() {
   retrying.value = true
   analysisStore.clearResult()
-  logMessages.value = []
   await startTask()
   retrying.value = false
 }
@@ -108,18 +101,12 @@ function progressPercent() {
     <!-- 成功提示 -->
     <div
       v-if="progress?.status === 'success'"
-      class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700 text-center"
+      class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2 text-sm text-green-700"
     >
-      ✅ 数据获取完成，正在跳转…
-    </div>
-
-    <!-- 实时日志 -->
-    <div class="bg-gray-900 rounded-lg p-4 h-48 overflow-y-auto font-mono text-xs text-green-400 space-y-0.5">
-      <p v-if="logMessages.length === 0" class="text-gray-500">等待任务启动…</p>
-      <p v-for="(msg, i) in logMessages" :key="i">
-        <span class="text-gray-500">[{{ String(i + 1).padStart(2, '0') }}]</span>
-        {{ msg }}
-      </p>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-green-500 shrink-0">
+        <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+      数据获取完成，正在跳转…
     </div>
 
     <p class="text-xs text-center text-gray-400">

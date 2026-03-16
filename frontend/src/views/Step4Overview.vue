@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useWizardStore } from '@/stores/wizard'
+import AppIcon from '@/components/AppIcon.vue'
 
 const analysisStore = useAnalysisStore()
 const wizardStore = useWizardStore()
@@ -25,37 +26,37 @@ const cards = computed(() => {
     {
       label: '年均风速',
       value: `${firstStats.value.annualMeanWs.toFixed(2)} m/s`,
-      icon: '💨',
+      icon: 'wind',
       color: 'blue',
     },
     {
       label: '年均风功率密度',
       value: `${(firstWpd.value?.annualWpd ?? 0).toFixed(0)} W/m²`,
-      icon: '⚡',
+      icon: 'bolt',
       color: 'yellow',
     },
     {
       label: '主导风向',
       value: firstStats.value.dominantDirection,
-      icon: '🧭',
+      icon: 'compass',
       color: 'green',
     },
     {
       label: 'Weibull k',
       value: firstWeibull.value?.k.toFixed(3) ?? '—',
-      icon: '📈',
+      icon: 'arrow-trending-up',
       color: 'purple',
     },
     {
       label: 'Weibull c',
       value: firstWeibull.value ? `${firstWeibull.value.c.toFixed(2)} m/s` : '—',
-      icon: '📉',
+      icon: 'arrow-trending-down',
       color: 'indigo',
     },
     {
       label: '数据有效率',
       value: `${firstStats.value.dataValidRate.toFixed(1)}%`,
-      icon: '✅',
+      icon: 'check-circle',
       color: 'teal',
     },
   ]
@@ -93,7 +94,7 @@ const colorMap: Record<string, string> = {
         :class="colorMap[card.color]"
       >
         <div class="flex items-center gap-2">
-          <span class="text-xl">{{ card.icon }}</span>
+          <AppIcon :name="card.icon" class="w-5 h-5" />
           <span class="text-xs font-medium opacity-70">{{ card.label }}</span>
         </div>
         <p class="text-2xl font-bold">{{ card.value }}</p>
