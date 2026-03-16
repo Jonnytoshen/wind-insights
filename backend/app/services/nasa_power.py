@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from app.config import NASA_POWER_BASE_URL, NASA_MAX_CONNECTIONS
+from app.config import NASA_POWER_BASE_URL, NASA_POWER_ENDPOINT, NASA_MAX_CONNECTIONS
 from app.core.validators import snap_to_merra2_grid
 
 logger = logging.getLogger(__name__)
@@ -32,8 +32,9 @@ async def _fetch_year(
     """Fetch a single year of wind data for one height level with exponential backoff retry."""
     # Wind direction: ≤50 m → WD10M, >50 m → WD50M (API limitation)
     wd_param = "WD10M" if height <= 50 else "WD50M"
-    # Wind speed custom height parameter
-    ws_param = f"WSC{height}M"
+    # Request WS50M as the base parameter; when wind-elevation is set the API
+    # automatically returns a 'WSC' key containing the adjusted custom-height speed.
+    ws_param = "WS50M"
 
     # Explicit param dict – never pass user input directly (SSRF/injection protection)
     params: dict[str, Any] = {
@@ -53,7 +54,7 @@ async def _fetch_year(
         async with semaphore:
             try:
                 response = await client.get(
-                    "/v2/temporal/hourly/point",
+                    NASA_POWER_ENDPOINT,
                     params=params,
                     timeout=60.0,
                 )
@@ -82,14 +83,15 @@ def _parse_year_response(data: dict[str, Any], height: int) -> pd.DataFrame:
     props = data.get("properties", {})
     parameters = props.get("parameter", {})
 
-    ws_key = f"WSC{height}M"
+    # The API returns the custom-height adjusted wind speed under key 'WSC'
+    # regardless of the requested height. 'WS50M' is the unadjusted base.
+    ws_key = "WSC"
     wd_key = "WD10M" if height <= 50 else "WD50M"
 
-    ws_data = parameters.get(ws_key, {})
+    ws_data = parameters.get(ws_key) or parameters.get("WS50M", {})
     wd_data = parameters.get(wd_key, {})
 
     if not ws_data:
-        # Fall back: check what keys are actually present
         available = list(parameters.keys())
         raise NASAPowerError(
             f"API 响应中未找到高度 {height}m 的风速数据。"

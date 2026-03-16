@@ -23,7 +23,8 @@ CACHE_TTL_SECONDS: int = int(os.environ.get("CACHE_TTL_SECONDS", "1800"))
 # ---------------------------------------------------------------------------
 # NASA POWER API
 # ---------------------------------------------------------------------------
-NASA_POWER_BASE_URL: str = "https://power.larc.nasa.gov/api/temporal/hourly/point"
+NASA_POWER_BASE_URL: str = "https://power.larc.nasa.gov"
+NASA_POWER_ENDPOINT: str = "/api/temporal/hourly/point"
 NASA_MAX_CONNECTIONS: int = 10
 NASA_MAX_KEEPALIVE: int = 5
 NASA_RETRY_MAX: int = 3
