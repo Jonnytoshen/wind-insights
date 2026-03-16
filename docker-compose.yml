@@ -3,6 +3,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       - TASK_TIMEOUT_SECONDS=${TASK_TIMEOUT_SECONDS:-300}
